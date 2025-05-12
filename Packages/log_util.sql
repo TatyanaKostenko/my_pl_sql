@@ -19,13 +19,14 @@ END log_util;
 
 CREATE OR REPLACE PACKAGE BODY log_util IS
 
-  -- Внутрішня процедура логування (оголошена тільки в body)
+  -- Р’РЅСѓС‚СЂС–С€РЅСЏ РїСЂРѕС†РµРґСѓСЂР° Р»РѕРіСѓРІР°РЅРЅСЏ Р· Р°РІС‚РѕРЅРѕРјРЅРѕСЋ С‚СЂР°РЅР·Р°РєС†С–С”СЋ
   PROCEDURE to_log(
     p_appl_proc IN VARCHAR2,
     p_message   IN VARCHAR2
   ) IS
+    PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    -- Тут приклад просто вставки в якусь таблицю логів
+    -- Р’СЃС‚Р°РІРєР° РІ С‚Р°Р±Р»РёС†СЋ Р»РѕРіС–РІ
     INSERT INTO log_table (log_date, appl_proc, message)
     VALUES (SYSDATE, p_appl_proc, p_message);
     
@@ -39,7 +40,7 @@ CREATE OR REPLACE PACKAGE BODY log_util IS
     v_text VARCHAR2(4000);
   BEGIN
     IF p_text IS NULL THEN
-      v_text := 'Старт логування, назва процесу = ' || p_proc_name;
+      v_text := 'РЎС‚Р°СЂС‚ Р»РѕРіСѓРІР°РЅРЅСЏ, РЅР°Р·РІР° РїСЂРѕС†РµСЃСѓ = ' || p_proc_name;
     ELSE
       v_text := p_text;
     END IF;
@@ -54,7 +55,7 @@ CREATE OR REPLACE PACKAGE BODY log_util IS
     v_text VARCHAR2(4000);
   BEGIN
     IF p_text IS NULL THEN
-      v_text := 'Завершення логування, назва процесу = ' || p_proc_name;
+      v_text := 'Р—Р°РІРµСЂС€РµРЅРЅСЏ Р»РѕРіСѓРІР°РЅРЅСЏ, РЅР°Р·РІР° РїСЂРѕС†РµСЃСѓ = ' || p_proc_name;
     ELSE
       v_text := p_text;
     END IF;
@@ -70,7 +71,7 @@ CREATE OR REPLACE PACKAGE BODY log_util IS
     v_text VARCHAR2(4000);
   BEGIN
     IF p_text IS NULL THEN
-      v_text := 'В процедурі ' || p_proc_name || ' сталася помилка. ' || p_sqlerrm;
+      v_text := 'Р’ РїСЂРѕС†РµРґСѓСЂС– ' || p_proc_name || ' СЃС‚Р°Р»Р°СЃСЏ РїРѕРјРёР»РєР°. ' || p_sqlerrm;
     ELSE
       v_text := p_text;
     END IF;
@@ -80,5 +81,3 @@ CREATE OR REPLACE PACKAGE BODY log_util IS
 
 END log_util;
 /
-
-
