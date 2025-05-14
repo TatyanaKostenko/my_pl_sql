@@ -118,9 +118,15 @@ END util;
 /
 
 
+
+
+
+
+
+
 CREATE OR REPLACE PACKAGE BODY util IS
 
-  --  Перевірка робочого часу
+  -- Перевірка робочого часу
   PROCEDURE check_working_time IS
   BEGIN
     IF TO_CHAR(SYSDATE, 'DY', 'NLS_DATE_LANGUAGE=AMERICAN') IN ('SAT', 'SUN') OR
@@ -129,51 +135,54 @@ CREATE OR REPLACE PACKAGE BODY util IS
     END IF;
   END check_working_time;
 
-  --  Процедура звільнення співробітника
+  -- Процедура звільнення співробітника (оптимізована)
   PROCEDURE fire_an_employee(p_employee_id IN NUMBER) IS
-    v_exists         NUMBER;
-    v_first_name     tetyana_p15.employees.first_name%TYPE;
-    v_last_name      tetyana_p15.employees.last_name%TYPE;
-    v_job_id         tetyana_p15.employees.job_id%TYPE;
-    v_department_id  tetyana_p15.employees.department_id%TYPE;
+    -- Змінні для співробітника
+    v_employee_id     tetyana_p15.employees.employee_id%TYPE;
+    v_first_name      tetyana_p15.employees.first_name%TYPE;
+    v_last_name       tetyana_p15.employees.last_name%TYPE;
+    v_email           tetyana_p15.employees.email%TYPE;
+    v_phone_number    tetyana_p15.employees.phone_number%TYPE;
+    v_hire_date       tetyana_p15.employees.hire_date%TYPE;
+    v_job_id          tetyana_p15.employees.job_id%TYPE;
+    v_salary          tetyana_p15.employees.salary%TYPE;
+    v_commission_pct  tetyana_p15.employees.commission_pct%TYPE;
+    v_manager_id      tetyana_p15.employees.manager_id%TYPE;
+    v_department_id   tetyana_p15.employees.department_id%TYPE;
   BEGIN
     log_util.log_start('fire_an_employee');
 
     -- Перевірка робочого часу
     check_working_time;
 
-    -- Перевірка існування співробітника
-    SELECT COUNT(*) INTO v_exists
-    FROM tetyana_p15.employees
-    WHERE employee_id = p_employee_id;
+    -- Отримати всі дані по співробітнику
+    BEGIN
+      SELECT employee_id, first_name, last_name, email, phone_number, hire_date,
+             job_id, salary, commission_pct, manager_id, department_id
+      INTO
+           v_employee_id, v_first_name, v_last_name, v_email, v_phone_number,
+           v_hire_date, v_job_id, v_salary, v_commission_pct, v_manager_id, v_department_id
+      FROM tetyana_p15.employees
+      WHERE employee_id = p_employee_id;
+    EXCEPTION
+    WHEN OTHERS THEN -- Перевірка існування співробітника
+    raise_application_error(-20001, 'Переданий співробітник не існує. Detail: '||SQLERRM);
+      END;
 
-    IF v_exists = 0 THEN
-      RAISE_APPLICATION_ERROR(-20001, 'Переданий співробітник не існує');
-    END IF;
-
-    -- Збереження інформації перед видаленням
+    -- Вставка в історичну таблицю (через dual)
     INSERT INTO tetyana_p15.employees_history (
-      employee_id, first_name, last_name, email,
-      phone_number, hire_date, job_id, salary,
-      commission_pct, manager_id, department_id, fired_at
+      employee_id, first_name, last_name, email, phone_number, hire_date,
+      job_id, salary, commission_pct, manager_id, department_id, fired_at
     )
     SELECT
-      employee_id, first_name, last_name, email,
-      phone_number, hire_date, job_id, salary,
-      commission_pct, manager_id, department_id, SYSDATE
-    FROM tetyana_p15.employees
-    WHERE employee_id = p_employee_id;
-
-    -- Отримати дані для повідомлення
-    SELECT first_name, last_name, job_id, department_id
-    INTO v_first_name, v_last_name, v_job_id, v_department_id
-    FROM tetyana_p15.employees
-    WHERE employee_id = p_employee_id;
+      v_employee_id, v_first_name, v_last_name, v_email, v_phone_number,
+      v_hire_date, v_job_id, v_salary, v_commission_pct, v_manager_id, v_department_id, SYSDATE
+    FROM dual;
 
     -- Видалення співробітника
     BEGIN
       DELETE FROM tetyana_p15.employees
-      WHERE employee_id = p_employee_id;
+      WHERE employee_id = v_employee_id;
 
       DBMS_OUTPUT.PUT_LINE(
         'Співробітник ' || v_first_name || ', ' || v_last_name || ', ' || v_job_id || ', ' || v_department_id || ' успішно звільнений.'
@@ -185,8 +194,10 @@ CREATE OR REPLACE PACKAGE BODY util IS
     END;
 
     log_util.log_finish('fire_an_employee');
-
   END fire_an_employee;
 
 END util;
 /
+
+
+   
