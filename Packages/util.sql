@@ -1,18 +1,43 @@
 CREATE OR REPLACE PACKAGE util IS
+  -- Процедура для додавання нового співробітника
   PROCEDURE add_employee(
     p_first_name     IN VARCHAR2,
     p_last_name      IN VARCHAR2,
     p_email          IN VARCHAR2,
     p_phone_number   IN VARCHAR2,
-    p_hire_date      IN DATE      DEFAULT TRUNC(SYSDATE, 'dd'),
+    p_hire_date      IN DATE DEFAULT TRUNC(SYSDATE, 'dd'),
     p_job_id         IN VARCHAR2,
     p_salary         IN NUMBER,
-    p_commission_pct IN NUMBER    DEFAULT NULL,
-    p_manager_id     IN NUMBER    DEFAULT 100,
+    p_commission_pct IN NUMBER DEFAULT NULL,
+    p_manager_id     IN NUMBER DEFAULT 100,
     p_department_id  IN NUMBER
   );
+
+  -- Процедура для перевірки робочого часу
+  PROCEDURE check_working_time;
+
+  -- Процедура для звільнення співробітника
+  PROCEDURE fire_an_employee(p_employee_id IN NUMBER);
+
+  -- Процедура для зміни атрибутів співробітника
+  PROCEDURE change_attribute_employee(
+    p_employee_id     IN NUMBER,
+    p_first_name      IN VARCHAR2 DEFAULT NULL,
+    p_last_name       IN VARCHAR2 DEFAULT NULL,
+    p_email           IN VARCHAR2 DEFAULT NULL,
+    p_phone_number    IN VARCHAR2 DEFAULT NULL,
+    p_job_id          IN VARCHAR2 DEFAULT NULL,
+    p_salary          IN NUMBER DEFAULT NULL,
+    p_commission_pct  IN NUMBER DEFAULT NULL,
+    p_manager_id      IN NUMBER DEFAULT NULL,
+    p_department_id   IN NUMBER DEFAULT NULL
+  );
+
+
 END util;
-/
+
+
+
 
 CREATE OR REPLACE PACKAGE BODY util IS
 
@@ -21,11 +46,11 @@ CREATE OR REPLACE PACKAGE BODY util IS
     p_last_name      IN VARCHAR2,
     p_email          IN VARCHAR2,
     p_phone_number   IN VARCHAR2,
-    p_hire_date      IN DATE      DEFAULT TRUNC(SYSDATE, 'dd'),
+    p_hire_date      IN DATE DEFAULT TRUNC(SYSDATE, 'dd'),
     p_job_id         IN VARCHAR2,
     p_salary         IN NUMBER,
-    p_commission_pct IN NUMBER    DEFAULT NULL,
-    p_manager_id     IN NUMBER    DEFAULT 100,
+    p_commission_pct IN NUMBER DEFAULT NULL,
+    p_manager_id     IN NUMBER DEFAULT 100,
     p_department_id  IN NUMBER
   ) IS
     v_new_employee_id   employees.employee_id%TYPE;
@@ -103,7 +128,6 @@ CREATE OR REPLACE PACKAGE BODY util IS
       );
 
       DBMS_OUTPUT.PUT_LINE('Співробітник ' || p_first_name || ', ' || p_last_name || ', ' || p_job_id || ', ' || p_department_id || ' успішно додано до системи');
-
     EXCEPTION
       WHEN OTHERS THEN
         log_util.log_error('add_employee', SQLERRM);
@@ -114,28 +138,14 @@ CREATE OR REPLACE PACKAGE BODY util IS
 
   END add_employee;
 
-END util;
-/
-
-
-
-
-
-
-
-
-CREATE OR REPLACE PACKAGE BODY util IS
-
-  -- Перевірка робочого часу
   PROCEDURE check_working_time IS
   BEGIN
     IF TO_CHAR(SYSDATE, 'DY', 'NLS_DATE_LANGUAGE=AMERICAN') IN ('SAT', 'SUN') OR
        TO_CHAR(SYSDATE, 'HH24MI') NOT BETWEEN '0800' AND '1800' THEN
-      RAISE_APPLICATION_ERROR(-20001, 'Ви можете видаляти співробітника лише в робочий час');
+      RAISE_APPLICATION_ERROR(-20001, 'Зміни дозволені лише в робочий час');
     END IF;
   END check_working_time;
 
-  -- Процедура звільнення співробітника (оптимізована)
   PROCEDURE fire_an_employee(p_employee_id IN NUMBER) IS
     -- Змінні для співробітника
     v_employee_id     tetyana_p15.employees.employee_id%TYPE;
@@ -167,7 +177,7 @@ CREATE OR REPLACE PACKAGE BODY util IS
     EXCEPTION
     WHEN OTHERS THEN -- Перевірка існування співробітника
     raise_application_error(-20001, 'Переданий співробітник не існує. Detail: '||SQLERRM);
-      END;
+    END;
 
     -- Вставка в історичну таблицю (через dual)
     INSERT INTO tetyana_p15.employees_history (
@@ -196,25 +206,6 @@ CREATE OR REPLACE PACKAGE BODY util IS
     log_util.log_finish('fire_an_employee');
   END fire_an_employee;
 
-END util;
-/
-
-
-
-
-
-CREATE OR REPLACE PACKAGE BODY util IS
-
-  --  Перевірка робочого часу (за потреби)
-  PROCEDURE check_working_time IS
-  BEGIN
-    IF TO_CHAR(SYSDATE, 'DY', 'NLS_DATE_LANGUAGE=AMERICAN') IN ('SAT', 'SUN') OR
-       TO_CHAR(SYSDATE, 'HH24MI') NOT BETWEEN '0800' AND '1800' THEN
-      RAISE_APPLICATION_ERROR(-20001, 'Зміни дозволені лише в робочий час');
-    END IF;
-  END check_working_time;
-
-  --  Зміна атрибутів співробітника
   PROCEDURE change_attribute_employee(
     p_employee_id     IN NUMBER,
     p_first_name      IN VARCHAR2 DEFAULT NULL,
@@ -222,10 +213,10 @@ CREATE OR REPLACE PACKAGE BODY util IS
     p_email           IN VARCHAR2 DEFAULT NULL,
     p_phone_number    IN VARCHAR2 DEFAULT NULL,
     p_job_id          IN VARCHAR2 DEFAULT NULL,
-    p_salary          IN NUMBER   DEFAULT NULL,
-    p_commission_pct  IN NUMBER   DEFAULT NULL,
-    p_manager_id      IN NUMBER   DEFAULT NULL,
-    p_department_id   IN NUMBER   DEFAULT NULL
+    p_salary          IN NUMBER DEFAULT NULL,
+    p_commission_pct  IN NUMBER DEFAULT NULL,
+    p_manager_id      IN NUMBER DEFAULT NULL,
+    p_department_id   IN NUMBER DEFAULT NULL
   ) IS
     v_any_change BOOLEAN := FALSE;
   BEGIN
@@ -305,81 +296,8 @@ CREATE OR REPLACE PACKAGE BODY util IS
 
     log_util.log_finish('change_attribute_employee');
   END change_attribute_employee;
-
-END util;
-/
+  
 
 
 
-
-
-
-
-
-
-
-
-
-CREATE OR REPLACE PROCEDURE tetyana_p15.api_nbu_sync IS
-    v_list_currencies VARCHAR2(2000);
-    v_curr VARCHAR2(3);
-    v_exchange_rate NUMBER;
-    v_rate_date DATE;
-BEGIN
-    -- Завести параметр з валютами для синхронізації
-    BEGIN
-        INSERT INTO tetyana_p15.sys_params (param_name, value_date, value_text, param_descr)
-        VALUES ('list_currencies', SYSDATE, 'USD,EUR,KZT,AMD,GBP,ILS', 'Список валют для синхронізації в процедурі util.api_nbu_sync');
-    EXCEPTION
-        WHEN DUP_VAL_ON_INDEX THEN
-            -- Якщо такий параметр вже є, то не вставляємо, а просто отримуємо значення
-            NULL;
-    END;
-
-    -- Отримуємо список валют з таблиці sys_params
-    BEGIN
-        SELECT value_text INTO v_list_currencies
-        FROM tetyana_p15.sys_params
-        WHERE param_name = 'list_currencies';
-    EXCEPTION
-        WHEN OTHERS THEN
-            log_util.log_error('api_nbu_sync', 'Помилка при отриманні списку валют: ' || SQLERRM);
-            RAISE_APPLICATION_ERROR(-20001, 'Помилка при отриманні списку валют');
-    END;
-
-    -- Прокручуємо список валют і виконуємо операції синхронізації
-    FOR cc IN (SELECT value_list AS curr FROM TABLE(util.table_from_list(p_list_val => v_list_currencies))) LOOP
-        BEGIN
-            -- Отримуємо курс для валюти з API
-            SELECT * INTO v_exchange_rate, v_rate_date
-            FROM TABLE(util.get_currency(p_currency => cc.curr));
-
-            -- Вставка нових даних в таблицю cur_exchange
-            INSERT INTO tetyana_p15.cur_exchange (currency_code, exchange_rate, rate_date)
-            VALUES (cc.curr, v_exchange_rate, v_rate_date);
-
-            -- Логування успіху
-            log_util.log_finish('api_nbu_sync', 'Для валюти ' || cc.curr || ' курс оновлений успішно');
-
-        EXCEPTION
-            WHEN OTHERS THEN
-                -- Логування помилки
-                log_util.log_error('api_nbu_sync', 'Помилка при синхронізації валюти ' || cc.curr || ': ' || SQLERRM);
-                CONTINUE;
-        END;
-    END LOOP;
-
-    -- Завершення процедури
-    log_util.log_finish('api_nbu_sync', 'Процедура синхронізації завершена успішно');
-END api_nbu_sync;
-/
-
-
-
-
-
-
-
-
-
-   
+END util; 
