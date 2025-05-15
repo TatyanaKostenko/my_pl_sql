@@ -13,9 +13,6 @@ CREATE OR REPLACE PACKAGE util IS
     p_department_id  IN NUMBER
   );
 
-  -- Процедура для перевірки робочого часу
-  PROCEDURE check_working_time;
-
   -- Процедура для звільнення співробітника
   PROCEDURE fire_an_employee(p_employee_id IN NUMBER);
 
