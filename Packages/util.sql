@@ -310,4 +310,76 @@ END util;
 /
 
 
+
+
+
+
+
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE tetyana_p15.api_nbu_sync IS
+    v_list_currencies VARCHAR2(2000);
+    v_curr VARCHAR2(3);
+    v_exchange_rate NUMBER;
+    v_rate_date DATE;
+BEGIN
+    -- Завести параметр з валютами для синхронізації
+    BEGIN
+        INSERT INTO tetyana_p15.sys_params (param_name, value_date, value_text, param_descr)
+        VALUES ('list_currencies', SYSDATE, 'USD,EUR,KZT,AMD,GBP,ILS', 'Список валют для синхронізації в процедурі util.api_nbu_sync');
+    EXCEPTION
+        WHEN DUP_VAL_ON_INDEX THEN
+            -- Якщо такий параметр вже є, то не вставляємо, а просто отримуємо значення
+            NULL;
+    END;
+
+    -- Отримуємо список валют з таблиці sys_params
+    BEGIN
+        SELECT value_text INTO v_list_currencies
+        FROM tetyana_p15.sys_params
+        WHERE param_name = 'list_currencies';
+    EXCEPTION
+        WHEN OTHERS THEN
+            log_util.log_error('api_nbu_sync', 'Помилка при отриманні списку валют: ' || SQLERRM);
+            RAISE_APPLICATION_ERROR(-20001, 'Помилка при отриманні списку валют');
+    END;
+
+    -- Прокручуємо список валют і виконуємо операції синхронізації
+    FOR cc IN (SELECT value_list AS curr FROM TABLE(util.table_from_list(p_list_val => v_list_currencies))) LOOP
+        BEGIN
+            -- Отримуємо курс для валюти з API
+            SELECT * INTO v_exchange_rate, v_rate_date
+            FROM TABLE(util.get_currency(p_currency => cc.curr));
+
+            -- Вставка нових даних в таблицю cur_exchange
+            INSERT INTO tetyana_p15.cur_exchange (currency_code, exchange_rate, rate_date)
+            VALUES (cc.curr, v_exchange_rate, v_rate_date);
+
+            -- Логування успіху
+            log_util.log_finish('api_nbu_sync', 'Для валюти ' || cc.curr || ' курс оновлений успішно');
+
+        EXCEPTION
+            WHEN OTHERS THEN
+                -- Логування помилки
+                log_util.log_error('api_nbu_sync', 'Помилка при синхронізації валюти ' || cc.curr || ': ' || SQLERRM);
+                CONTINUE;
+        END;
+    END LOOP;
+
+    -- Завершення процедури
+    log_util.log_finish('api_nbu_sync', 'Процедура синхронізації завершена успішно');
+END api_nbu_sync;
+/
+
+
+
+
+
+
+
+
+
    
