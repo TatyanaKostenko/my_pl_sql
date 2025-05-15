@@ -200,4 +200,114 @@ END util;
 /
 
 
+
+
+
+CREATE OR REPLACE PACKAGE BODY util IS
+
+  --  Перевірка робочого часу (за потреби)
+  PROCEDURE check_working_time IS
+  BEGIN
+    IF TO_CHAR(SYSDATE, 'DY', 'NLS_DATE_LANGUAGE=AMERICAN') IN ('SAT', 'SUN') OR
+       TO_CHAR(SYSDATE, 'HH24MI') NOT BETWEEN '0800' AND '1800' THEN
+      RAISE_APPLICATION_ERROR(-20001, 'Зміни дозволені лише в робочий час');
+    END IF;
+  END check_working_time;
+
+  --  Зміна атрибутів співробітника
+  PROCEDURE change_attribute_employee(
+    p_employee_id     IN NUMBER,
+    p_first_name      IN VARCHAR2 DEFAULT NULL,
+    p_last_name       IN VARCHAR2 DEFAULT NULL,
+    p_email           IN VARCHAR2 DEFAULT NULL,
+    p_phone_number    IN VARCHAR2 DEFAULT NULL,
+    p_job_id          IN VARCHAR2 DEFAULT NULL,
+    p_salary          IN NUMBER   DEFAULT NULL,
+    p_commission_pct  IN NUMBER   DEFAULT NULL,
+    p_manager_id      IN NUMBER   DEFAULT NULL,
+    p_department_id   IN NUMBER   DEFAULT NULL
+  ) IS
+    v_any_change BOOLEAN := FALSE;
+  BEGIN
+    log_util.log_start('change_attribute_employee');
+
+    -- Перевірка, що хоча б одне поле задане
+    IF p_first_name IS NULL AND
+       p_last_name IS NULL AND
+       p_email IS NULL AND
+       p_phone_number IS NULL AND
+       p_job_id IS NULL AND
+       p_salary IS NULL AND
+       p_commission_pct IS NULL AND
+       p_manager_id IS NULL AND
+       p_department_id IS NULL THEN
+      DBMS_OUTPUT.PUT_LINE('Жодне поле не передано для оновлення.');
+      log_util.log_finish('change_attribute_employee');
+      RETURN;
+    END IF;
+
+    -- Оновлення кожного атрибута, якщо передано
+    BEGIN
+      IF p_first_name IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET first_name = p_first_name WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_last_name IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET last_name = p_last_name WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_email IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET email = p_email WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_phone_number IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET phone_number = p_phone_number WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_job_id IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET job_id = p_job_id WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_salary IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET salary = p_salary WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_commission_pct IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET commission_pct = p_commission_pct WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_manager_id IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET manager_id = p_manager_id WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF p_department_id IS NOT NULL THEN
+        UPDATE tetyana_p15.employees SET department_id = p_department_id WHERE employee_id = p_employee_id;
+        v_any_change := TRUE;
+      END IF;
+
+      IF v_any_change THEN
+        DBMS_OUTPUT.PUT_LINE('У співробітника ' || p_employee_id || ' успішно оновлені атрибути.');
+      END IF;
+
+    EXCEPTION
+      WHEN OTHERS THEN
+        log_util.log_error('change_attribute_employee', SQLERRM);
+        RAISE;
+    END;
+
+    log_util.log_finish('change_attribute_employee');
+  END change_attribute_employee;
+
+END util;
+/
+
+
    
